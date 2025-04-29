@@ -28,9 +28,7 @@ function App() {
     if (!username) return;
     try {
       const response = await fetch(`/list-images?username=${encodeURIComponent(username)}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch images');
-      }
+      if (!response.ok) throw new Error('Failed to fetch images');
       const data = await response.json();
       setImages(data.images);
     } catch (error) {
@@ -46,7 +44,6 @@ function App() {
     }
 
     setLoading(true);
-
     const formData = new FormData();
     formData.append('file', file);
     formData.append('operation', operation);
@@ -67,24 +64,15 @@ function App() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Server responded with an error');
-      }
+      if (!response.ok) throw new Error('Server responded with an error');
 
       const blob = await response.blob();
       const newImageUrl = URL.createObjectURL(blob);
       setImageUrl(newImageUrl);
       const newFile = new File([blob], 'processed_image.jpg', { type: 'image/jpeg' });
       setFile(newFile);
-
-      // Fetch updated image list
       fetchImages(username);
-
-      setFile(newFile);
-      if (fileInputRef.current) {
-          fileInputRef.current.value = '';  // Reset file input
-      }
-
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error('Error processing image:', error);
       alert('Failed to process image');
@@ -93,165 +81,89 @@ function App() {
     }
   };
 
-  const handleImageClick = (imageName) => {
-      const fullUrl = `/static/uploads/${imageName}`;
-      setImageUrl(fullUrl);
-   };
+  const handleImageClick = async (imageName) => {
+    const fullUrl = `/static/uploads/${imageName}`;
+    try {
+      const res = await fetch(fullUrl);
+      const blob = await res.blob();
+      const loadedFile = new File([blob], imageName, { type: blob.type });
+      setFile(loadedFile);
+      setImageUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      console.error("Failed to load image from server", err);
+    }
+  };
 
   useEffect(() => {
-    if (username) {
-      fetchImages(username);
-    }
+    if (username) fetchImages(username);
   }, [username]);
 
   return (
     <div style={{ margin: '20px' }}>
       <h1>Image Processing App</h1>
-
       <div style={{ display: 'flex' }}>
-        {/* Left side: Form and Image */}
         <div style={{ flex: 2 }}>
           <form onSubmit={handleSubmit}>
             <div>
-              <label>
-                Username: &nbsp;
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                /> &nbsp;
+              <label>Username:&nbsp;
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
               </label>
-              <br /> &nbsp;
-            </div>
-
+            </div><br />
             <div>
-              <label>
-                Select Image: &nbsp;
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  ref={fileInputRef}
-                /> &nbsp;
+              <label>Select Image:&nbsp;
+                <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} />
               </label>
-              <br />&nbsp;
-            </div>
-
+            </div><br />
             <div>
-              <label>
-                Operation: &nbsp;
-                <select
-                  value={operation}
-                  onChange={(e) => setOperation(e.target.value)}
-                >
+              <label>Operation:&nbsp;
+                <select value={operation} onChange={(e) => setOperation(e.target.value)}>
                   <option value="crop">Crop</option>
                   <option value="rotate">Rotate</option>
                   <option value="flip_h">Flip Horizontally</option>
                   <option value="flip_v">Flip Vertically</option>
                 </select>
               </label>
-              <br /> &nbsp;
-            </div>
-
+            </div><br />
             {operation === 'crop' && (
               <div>
-                <label>
-                  X:&nbsp;
-                  <input
-                    type="number"
-                    value={cropDimensions.x}
-                    onChange={(e) => setCropDimensions({ ...cropDimensions, x: parseInt(e.target.value) })}
-                  />
-                  &nbsp;&nbsp;
-                </label>
-                <label>
-                  Y:&nbsp;
-                  <input
-                    type="number"
-                    value={cropDimensions.y}
-                    onChange={(e) => setCropDimensions({ ...cropDimensions, y: parseInt(e.target.value) })}
-                  />
-                  &nbsp;&nbsp;
-                </label>
-                <label>
-                  Width:&nbsp;
-                  <input
-                    type="number"
-                    value={cropDimensions.width}
-                    onChange={(e) => setCropDimensions({ ...cropDimensions, width: parseInt(e.target.value) })}
-                  />
-                  &nbsp;&nbsp;
-                </label>
-                <label>
-                  Height:&nbsp;
-                  <input
-                    type="number"
-                    value={cropDimensions.height}
-                    onChange={(e) => setCropDimensions({ ...cropDimensions, height: parseInt(e.target.value) })}
-                  />
-                </label>
+                {['x', 'y', 'width', 'height'].map((key) => (
+                  <label key={key}>{key.toUpperCase()}:&nbsp;
+                    <input type="number" value={cropDimensions[key]} onChange={(e) =>
+                      setCropDimensions({ ...cropDimensions, [key]: parseInt(e.target.value) })} />
+                    &nbsp;&nbsp;
+                  </label>
+                ))}
               </div>
             )}
-
             {operation === 'rotate' && (
               <div>
-                <label>
-                  Angle (degrees):
-                  <input
-                    type="number"
-                    value={rotationAngle}
-                    onChange={(e) => setRotationAngle(parseInt(e.target.value))}
-                  />
+                <label>Angle (degrees):&nbsp;
+                  <input type="number" value={rotationAngle}
+                    onChange={(e) => setRotationAngle(parseInt(e.target.value))} />
                 </label>
               </div>
             )}
-
-            {(operation === 'flip_h' || operation === 'flip_v') && (
-              <br />
-            )}
-
             <br />
-            <button
-              type="submit"
-              disabled={!file || loading}
-            >
+            <button type="submit" disabled={!file || loading}>
               {loading ? 'Processing...' : 'Process Image'}
             </button>
           </form>
 
-          <div>
-            {imageUrl && (
-              <div>
-                <h2>{loading ? 'Processing...' : 'Processed Image'}</h2>
-                <img
-                  src={imageUrl}
-                  alt="Processed"
-                />
-                {!loading && (
-                  <div>
-                    <a
-                      href={imageUrl}
-                      download="processed-image.jpg"
-                    >
-                      Download
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {imageUrl && (
+            <div>
+              <h2>{loading ? 'Processing...' : 'Processed Image'}</h2>
+              <img src={imageUrl} alt="Processed" />
+              {!loading && <a href={imageUrl} download="processed-image.jpg">Download</a>}
+            </div>
+          )}
         </div>
 
-        {/* Right side: Image list */}
         <div style={{ flex: 1, marginLeft: '30px' }}>
           <h2>Previous Images</h2>
           <ul>
             {images.map((imgName, idx) => (
-              <div key={idx}>
-                <br />
-                <button
-                  onClick={() => handleImageClick(imgName)}
-                >
+              <div key={idx}><br />
+                <button onClick={() => handleImageClick(imgName)}>
                   {imgName.split("_")[1] + "_" + imgName.split("_")[2]}
                 </button>
               </div>
