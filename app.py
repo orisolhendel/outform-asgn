@@ -3,8 +3,13 @@ from flask_cors import CORS
 from PIL import Image
 import io
 import os
+from datetime import datetime
 
 app = Flask(__name__, static_folder='client/build', static_url_path='/')
+
+@app.route('/static/uploads/<path:filename>')
+def serve_uploaded_file(filename):
+    return send_from_directory('client/build/static/uploads', filename)
 
 # Enable Cross-Origin Resource Sharing (CORS) for the frontend
 CORS(app)
@@ -84,6 +89,24 @@ def process_image():
     img.save(img_io, format=img_format)
     img_io.seek(0)
 
+    # save file to disk
+    username = request.form.get('username', 'anonymous')
+    print (username)
+    file = request.files['file']
+    original_filename = file.filename
+
+    # Create a timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    # Combine everything
+    safe_filename = f"{username}_{timestamp}_{original_filename}"
+    save_path = os.path.join(app.root_path, 'client', 'build', 'static', 'uploads', safe_filename)
+
+    print("Saving file to:", os.path.abspath(save_path))
+
+    # Save the file
+    img.save(save_path)
+
     # Return the processed image
     return send_file(
         img_io,
@@ -91,6 +114,23 @@ def process_image():
         as_attachment=True,
         download_name=f'processed_{file.filename}'
     )
+@app.route('/list-images')
+def list_images():
+    username = request.args.get('username')
+    if not username:
+        return {'error': 'Username is required'}, 400
+
+    # Assuming images are saved under a folder like 'saved_images/'
+    uploads_dir = os.path.join(app.root_path, 'client', 'build', 'static', 'uploads')
+    all_files = os.listdir(uploads_dir)
+    user_files = [f for f in all_files if f.startswith(username + "_")]
+    user_files.sort()  # Optional: sort by name (timestamp)
+
+    return {'images': user_files}
+
+    UPLOAD_FOLDER = os.path.join(app.root_path, 'client', 'build', 'static', 'uploads')
+
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if __name__ == "__main__":
     # Run the Flask app
